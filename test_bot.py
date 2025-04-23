@@ -6,19 +6,22 @@ from datetime import date
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FoodPlanBot.settings')
 django.setup()
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram import Router
 from asgiref.sync import sync_to_async
 
 from bot_admin.models import Recipe, DailyRecipeLimit
+from bot_data.keyboards import create_inline_keyboard, private
+
+
 
 BOT_TOKEN = "7649928424:AAGNpZk9rzoeNgyxEyo71i5389w3ahY9y1U"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+
 router = Router()
 dp.include_router(router)
 
@@ -51,9 +54,11 @@ async def welcome_and_send_recipe(message: Message):
             f"<i>Ингредиенты:</i>\n{recipe.ingredients}"
         )
         await message.answer_photo(
+
             photo=types.FSInputFile(recipe.image.path),
             caption=caption,
             parse_mode="HTML"
+            reply_markup=create_inline_keyboard()
         )
     else:
         await message.answer("Вы уже получили 3 рецепта сегодня")
@@ -78,8 +83,16 @@ async def show_ingredients(message: Message):
         )
 
 
+
+@router.message(F.text.lower() == 'следующий')
+async def with_puree(message: types.Message):
+    await send_recipe(message)
+
+
 async def main():
     print("Бот запускается...")
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_my_commands(commands=private, scope=types.BotCommandScopeAllPrivateChats())
     await dp.start_polling(bot)
 
 
