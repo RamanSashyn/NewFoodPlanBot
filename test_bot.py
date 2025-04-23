@@ -16,7 +16,6 @@ from bot_admin.models import Recipe, DailyRecipeLimit
 from bot_data.keyboards import create_inline_keyboard, private
 
 
-
 BOT_TOKEN = "7649928424:AAGNpZk9rzoeNgyxEyo71i5389w3ahY9y1U"
 
 bot = Bot(token=BOT_TOKEN)
@@ -57,7 +56,7 @@ async def welcome_and_send_recipe(message: Message):
 
             photo=types.FSInputFile(recipe.image.path),
             caption=caption,
-            parse_mode="HTML"
+            parse_mode="HTML",
             reply_markup=create_inline_keyboard()
         )
     else:
@@ -83,8 +82,20 @@ async def show_ingredients(message: Message):
         )
 
 
+async def send_recipe(message: Message):
+    recipe = await sync_to_async(Recipe.get_recipe_for_user)(message.from_user.id)
 
-@router.message(F.text.lower() == 'следующий')
+    if recipe:
+        await message.answer_photo(
+             photo=types.FSInputFile(recipe.image.path),
+             caption=f"🍽 {recipe.title}\n\n{recipe.description}",
+             reply_markup=create_inline_keyboard()
+        )
+    else:
+        await message.answer("Вы уже получили 3 рецепта сегодня 🙃")
+
+
+@router.message(F.text.lower() == 'следующий рецепт')
 async def with_puree(message: types.Message):
     await send_recipe(message)
 
