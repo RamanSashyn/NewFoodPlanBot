@@ -5,7 +5,12 @@ from aiogram import types
 def create_inline_keyboard():
     kb = [
         [
-            types.KeyboardButton(text="Следующий"),
+            types.KeyboardButton(text="Следующий рецепт"),
+            types.KeyboardButton(text="Посмотреть ингредиенты"),
+        ],
+        [
+            types.KeyboardButton(text="Поставить лайк"),
+            types.KeyboardButton(text="Мои лайки"),
         ],
     ]
     keyboard = types.ReplyKeyboardMarkup(
