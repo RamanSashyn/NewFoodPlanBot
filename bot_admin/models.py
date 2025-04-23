@@ -28,6 +28,7 @@ class Recipe(models.Model):
         recipe = Recipe.objects.filter(is_active=True).order_by('?').first()
         if recipe:
             record.recipes_given += 1
+            record.last_recipe = recipe
             record.save()
         return recipe
 
@@ -46,6 +47,7 @@ class DailyRecipeLimit(models.Model):
     tg_user_id = models.BigIntegerField()
     date = models.DateField(default=timezone.now)
     recipes_given = models.IntegerField(default=0)
+    last_recipe = models.ForeignKey('Recipe', null=True, blank=True, on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ('tg_user_id', 'date')
