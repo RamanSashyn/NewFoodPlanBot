@@ -22,7 +22,7 @@ class Recipe(models.Model):
             defaults={'recipes_given': 0}
         )
 
-        if record.recipes_given >= 3:
+        if record.recipes_given >= 33:
             return None
 
         recipe = Recipe.objects.filter(is_active=True).order_by('?').first()
