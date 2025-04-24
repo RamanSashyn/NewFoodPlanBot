@@ -25,6 +25,29 @@ router = Router()
 dp.include_router(router)
 
 
+async def send_recipe(message: Message):
+    global recipe
+    recipe = await sync_to_async(Recipe.get_recipe_for_user)(message.from_user.id)
+    if recipe:
+        await message.answer_photo(
+             photo=types.FSInputFile(recipe.image.path),
+             caption=f"🍽 {recipe.title}\n\n{recipe.description}",
+             reply_markup=create_inline_keyboard()
+        )
+    else:
+        await message.answer("Вы уже получили 3 рецепта сегодня 🙃")
+    return recipe
+
+
+@router.message(F.text.lower() == 'следующий рецепт')
+async def get_recipe(message: types.Message):
+    await send_recipe(message)
+
+    @router.message(F.text.lower() == 'посмотреть ингредиенты')
+    async def get_ingredients(message: types.Message):
+        await message.answer(f'{recipe.ingredients}')
+
+
 @router.message(Command("start"))
 async def welcome_and_send_recipe(message: Message):
     # Приветственное сообщение
@@ -43,24 +66,8 @@ async def welcome_and_send_recipe(message: Message):
             "Каждый день мы подбираем для вас вкусное, простое и бюджетное блюдо."
         )
 
-    # Получение рецепта
-    recipe = await sync_to_async(Recipe.get_recipe_for_user)(message.from_user.id)
+    await get_recipe(message)
 
-    if recipe:
-        caption = (
-            f"<b>{recipe.title}</b>\n\n"
-            f"{recipe.description}\n\n"
-            f"<i>Ингредиенты:</i>\n{recipe.ingredients}"
-        )
-        await message.answer_photo(
-
-            photo=types.FSInputFile(recipe.image.path),
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=create_inline_keyboard()
-        )
-    else:
-        await message.answer("Вы уже получили 3 рецепта сегодня")
 
 # Список покупок по последнему рецепту
 @router.message(Command("buylist"))
@@ -80,24 +87,6 @@ async def show_ingredients(message: Message):
         await message.answer(
             "Сегодня ещё не было выбранного блюда. Напиши /start, чтобы получить рецепт."
         )
-
-
-async def send_recipe(message: Message):
-    recipe = await sync_to_async(Recipe.get_recipe_for_user)(message.from_user.id)
-
-    if recipe:
-        await message.answer_photo(
-             photo=types.FSInputFile(recipe.image.path),
-             caption=f"🍽 {recipe.title}\n\n{recipe.description}",
-             reply_markup=create_inline_keyboard()
-        )
-    else:
-        await message.answer("Вы уже получили 3 рецепта сегодня 🙃")
-
-
-@router.message(F.text.lower() == 'следующий рецепт')
-async def with_puree(message: types.Message):
-    await send_recipe(message)
 
 
 async def main():
