@@ -16,7 +16,7 @@ from bot_admin.models import Recipe, DailyRecipeLimit, UserRecipeInteraction
 from bot_data.keyboards import create_inline_keyboard, private
 
 
-BOT_TOKEN = "7649928424:AAGNpZk9rzoeNgyxEyo71i5389w3ahY9y1U"
+BOT_TOKEN = "8017797463:AAHs0PihkrEE8ceBQUt_pa5IVblCXumKsy4"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
