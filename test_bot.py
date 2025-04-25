@@ -12,7 +12,7 @@ from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 
-from bot_admin.models import Recipe, DailyRecipeLimit
+from bot_admin.models import Recipe, DailyRecipeLimit, UserRecipeInteraction
 from bot_data.keyboards import create_inline_keyboard, private
 
 
@@ -27,25 +27,41 @@ dp.include_router(router)
 
 async def send_recipe(message: Message):
     global recipe
-    recipe = await sync_to_async(Recipe.get_recipe_for_user)(message.from_user.id)
+    recipe, reason = await sync_to_async(Recipe.get_recipe_for_user)(message.from_user.id)
     if recipe:
         await message.answer_photo(
              photo=types.FSInputFile(recipe.image.path),
              caption=f"🍽 {recipe.title}\n\n{recipe.description}",
              reply_markup=create_inline_keyboard()
         )
-    else:
+    elif reason == "empty":
+        await message.answer("Рецепты пока что в доработке 👨‍🍳")
+    elif reason == "limit":
         await message.answer("Вы уже получили 3 рецепта сегодня 🙃")
-    return recipe
 
 
 @router.message(F.text.lower() == 'следующий рецепт')
 async def get_recipe(message: types.Message):
     await send_recipe(message)
 
-    @router.message(F.text.lower() == 'посмотреть ингредиенты')
-    async def get_ingredients(message: types.Message):
-        await message.answer(f'{recipe.ingredients}')
+
+@router.message(F.text.lower() == 'посмотреть ингредиенты')
+async def get_ingredients(message: types.Message):
+    def get_last_recipe():
+        record = DailyRecipeLimit.objects.filter(
+            tg_user_id=message.from_user.id,
+            date=date.today()
+        ).first()
+        return record.last_recipe if record and record.last_recipe else None
+
+    last_recipe = await sync_to_async(get_last_recipe)()
+
+    if last_recipe:
+        await message.answer(
+            f"Ингредиенты для блюда «{last_recipe.title}»:\n\n{last_recipe.ingredients}"
+        )
+    else:
+        await message.answer("Сначала получи рецепт, чтобы посмотреть ингредиенты.")
 
 
 @router.message(Command("start"))
@@ -69,24 +85,56 @@ async def welcome_and_send_recipe(message: Message):
     await get_recipe(message)
 
 
-# Список покупок по последнему рецепту
-@router.message(Command("buylist"))
-async def show_ingredients(message: Message):
-    record = await sync_to_async(
-        lambda: DailyRecipeLimit.objects.filter(
+@router.message(F.text.lower() == 'поставить лайк')
+async def like_recipe(message: Message):
+    def get_last_recipe():
+        record = DailyRecipeLimit.objects.filter(
             tg_user_id=message.from_user.id,
             date=date.today()
         ).first()
-    )()
+        return record.last_recipe if record and record.last_recipe else None
 
-    if record and record.last_recipe:
-        await message.answer(
-            f"Список покупок для блюда «{record.last_recipe.title}»:\n\n{record.last_recipe.ingredients}"
+    last_recipe = await sync_to_async(get_last_recipe)()
+
+    if last_recipe:
+        await sync_to_async(UserRecipeInteraction.objects.update_or_create)(
+            tg_user_id=message.from_user.id,
+            recipe=last_recipe,
+            defaults={"liked": True}
         )
+        await message.answer("❤️ Рецепт добавлен в избранное!")
     else:
-        await message.answer(
-            "Сегодня ещё не было выбранного блюда. Напиши /start, чтобы получить рецепт."
-        )
+        await message.answer("Сначала получи рецепт, чтобы его лайкнуть.")
+
+
+@router.message(F.text.lower() == 'мои лайки')
+async def show_liked_recipes(message: Message):
+    def get_liked_recipes():
+        return list(UserRecipeInteraction.objects.filter(
+            tg_user_id=message.from_user.id,
+            liked=True
+        ).select_related('recipe'))
+
+    interactions = await sync_to_async(get_liked_recipes)()
+
+    if interactions:
+        for interaction in interactions:
+            recipe = interaction.recipe
+            caption = (
+                f"<b>{recipe.title}</b>\n\n"
+                f"{recipe.description}\n\n"
+                f"<i>Ингредиенты:</i>\n{recipe.ingredients}"
+            )
+            try:
+                await message.answer_photo(
+                    photo=types.FSInputFile(recipe.image.path),
+                    caption=caption,
+                    parse_mode="HTML"
+                )
+            except Exception:
+                await message.answer(caption, parse_mode="HTML")
+    else:
+        await message.answer("Ты пока не отметил ни одного любимого рецепта.")
 
 
 async def main():
