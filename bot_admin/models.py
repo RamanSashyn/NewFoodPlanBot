@@ -22,16 +22,31 @@ class Recipe(models.Model):
             defaults={'recipes_given': 0}
         )
 
-        if record.recipes_given >= 33:
-            return None
+        if record.recipes_given >= 3:
+            return None, "limit"
 
-        recipe = Recipe.objects.filter(is_active=True).order_by('?').first()
-        if recipe:
-            record.recipes_given += 1
-            record.last_recipe = recipe
-            record.save()
-        return recipe
+        shown_ids = UserRecipeInteraction.objects.filter(
+            tg_user_id=tg_user_id
+        ).values_list('recipe_id', flat=True)
 
+        recipe = Recipe.objects.filter(
+            is_active=True
+        ).exclude(id__in=shown_ids).order_by('?').first()
+
+        if not recipe:
+            return None, "empty"
+
+        record.recipes_given += 1
+        record.last_recipe = recipe
+        record.save()
+
+        UserRecipeInteraction.objects.get_or_create(
+            tg_user_id=tg_user_id,
+            recipe=recipe,
+            defaults={"liked": False}
+        )
+
+        return recipe, None
 
 class UserRecipeInteraction(models.Model):
     tg_user_id = models.BigIntegerField()
